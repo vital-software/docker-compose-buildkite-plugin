@@ -14,6 +14,11 @@ image_file_name() {
   echo "$project_name-$COMPOSE_SERVICE_NAME-build-$BUILDKITE_BUILD_NUMBER"
 }
 
+set_docker_image_tag_meta_data() {
+  local tag="${1}"
+  buildkite-run "buildkite-agent meta-data set \"$(build_meta_data_image_tag_key "$COMPOSE_SERVICE_NAME")\" \"$tag\""
+}
+
 push_image_to_docker_repository() {
   local tag="$DOCKER_IMAGE_REPOSITORY:$(image_file_name)"
 
@@ -21,7 +26,7 @@ push_image_to_docker_repository() {
   buildkite-run "docker push $tag"
   buildkite-run "docker rmi $tag"
 
-  buildkite-run "buildkite-agent meta-data set \"$(build_meta_data_image_tag_key "$COMPOSE_SERVICE_NAME")\" \"$tag\""
+  set_docker_image_tag_meta_data "$tag"
 }
 
 if [[ -z "$BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_SCRIPT" ]]; then
@@ -31,6 +36,8 @@ else
   echo "+++ :docker: Building Docker Compose images for service $COMPOSE_SERVICE_NAME"
   buildkite-run "env BUILDKITE_DOCKER_COMPOSE_BUILD_TAG=\"$COMPOSE_SERVICE_DOCKER_IMAGE_NAME\" $BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_SCRIPT"
 fi
+
+set_docker_image_tag_meta_data "$COMPOSE_SERVICE_DOCKER_IMAGE_NAME"
 
 echo "~~~ :docker: Listing docker images"
 
