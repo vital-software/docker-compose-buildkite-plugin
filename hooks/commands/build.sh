@@ -24,9 +24,13 @@ push_image_to_docker_repository() {
   buildkite-run "buildkite-agent meta-data set \"$(build_meta_data_image_tag_key "$COMPOSE_SERVICE_NAME")\" \"$tag\""
 }
 
-echo "+++ :docker: Building Docker Compose images for service $COMPOSE_SERVICE_NAME"
-
-run_docker_compose "build $COMPOSE_SERVICE_NAME"
+if [[ -z "$BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_SCRIPT" ]]; then
+  echo "+++ :docker: Building Docker Compose images for service $COMPOSE_SERVICE_NAME"
+  run_docker_compose "build $COMPOSE_SERVICE_NAME"
+else
+  echo "+++ :docker: Building Docker Compose images for service $COMPOSE_SERVICE_NAME"
+  buildkite-run "env BUILDKITE_DOCKER_COMPOSE_BUILD_TAG=\"$COMPOSE_SERVICE_DOCKER_IMAGE_NAME\" $BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_SCRIPT"
+fi
 
 echo "~~~ :docker: Listing docker images"
 
