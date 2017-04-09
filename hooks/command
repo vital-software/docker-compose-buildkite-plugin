@@ -1,5 +1,7 @@
 #!/bin/bash
 
+env | grep BUILDKITE
+
 set -ueo pipefail
 
 ## SET UP SHARED FUNCTIONS

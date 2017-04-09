@@ -2,8 +2,6 @@
 
 set -eu
 
-env | grep BUILDKITE
-
 # If you build HEAD the pipeline.sh step, because it runs first, won't yet
 # have the updated commit SHA. So we have to figure it out ourselves.
 if [[ "${BUILDKITE_COMMIT:-HEAD}" == "HEAD" ]]; then
