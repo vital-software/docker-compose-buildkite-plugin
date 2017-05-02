@@ -20,10 +20,17 @@ function plugin_set_metadata() {
 
 # Gets a list of service / image pairs, each pair on a newline, delimited by space
 function get_prebuilt_images_from_metadata() {
-  local service
+  local service="${1:-}"
   local image
   local count
-  count=$(plugin_get_metadata "$META_IMAGE_COUNT")
+
+  if ! count=$(plugin_get_metadata "$META_IMAGE_COUNT") ; then
+    echo "SERVICE $service" >&2;
+    if image="$(plugin_get_metadata "${META_IMAGE_TAG}${service}")" ; then
+      echo "$service $image"
+      return 0
+    fi
+  fi
 
   [[ $count -gt 0 ]] || return 0
 

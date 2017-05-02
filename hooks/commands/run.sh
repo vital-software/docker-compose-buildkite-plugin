@@ -16,7 +16,7 @@ fi
 
 test -f "$override_file" && rm "$override_file"
 
-built_images=( $(get_prebuilt_images_from_metadata) )
+built_images=( $(get_prebuilt_images_from_metadata "$service_name") )
 
 echo "~~~ :docker: Found $((${#built_images[@]}/2)) pre-built services"
 
