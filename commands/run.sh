@@ -75,8 +75,13 @@ elif [[ ${#pull_services[@]} -eq 1 ]] ; then
   pull_params+=("pull" "${pull_services[0]}")
 fi
 
-# Pull down specified services
-if [[ ${#pull_services[@]} -gt 0 ]] ; then
+if [[ "$(plugin_read_config PULL_ALL "false")" == "true" ]] ; then
+  # Vital: We support pulling all images, in case they have been pulled on the agent machine already in
+  # an earlier build, and need to be updated
+  echo "~~~ :docker: Pulling all services"
+  retry "$pull_retries" run_docker_compose pull --parallel
+elif [[ ${#pull_services[@]} -gt 0 ]] ; then
+  # Pull down specified services
   echo "~~~ :docker: Pulling services ${pull_services[0]}"
   retry "$pull_retries" run_docker_compose "${pull_params[@]}"
 fi
