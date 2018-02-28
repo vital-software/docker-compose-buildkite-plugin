@@ -4,7 +4,7 @@ compose_cleanup() {
   if [[ "$(plugin_read_config LOG_ALL 'false')" == "true" ]]; then
     mkdir -p docker-compose-log-all
 
-    for container_name in $(docker_ps_by_project --format '{{.ID}}'); do
+    for container_name in $(docker_ps_by_project --format '{{.Names}}'); do
       docker logs -t "$container_name" > "docker-compose-log-all/${container_name}.log"
     done
 
