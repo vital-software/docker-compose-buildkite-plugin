@@ -1,6 +1,11 @@
 #!/bin/bash
 
 compose_cleanup() {
+  echo "~~~ :docker: Showing running containers"
+  run_docker_compose ps || true
+
+  echo "~~~ :docker: Checking for docker-engine logs"
+
   if [[ "$(plugin_read_config LOG_ALL 'false')" == "true" ]]; then
     mkdir -p docker-compose-log-all
 
