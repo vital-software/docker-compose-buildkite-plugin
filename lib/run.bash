@@ -12,6 +12,11 @@ compose_cleanup() {
       docker logs -t "$container_name" > "docker-compose-log-all/${container_name}.log" 2>&1
     done
 
+    echo "~~~ :docker: Collecting statistics to docker-stats.log"
+    docker stats --no-stream --no-trunc > docker-compose-log-all/docker-stats.log 2>&1
+    docker stats --no-stream --no-trunc -a > docker-compose-log-all/docker-stats-all.log 2>&1
+
+    echo "~~~ Uploading collected logs"
     buildkite-agent artifact upload "docker-compose-log-all/*.log"
   fi
 
