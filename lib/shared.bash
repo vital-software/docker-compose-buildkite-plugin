@@ -4,7 +4,13 @@
 function plugin_prompt() {
   if [[ -z "${HIDE_PROMPT:-}" ]] ; then
     echo -ne '\033[90m$\033[0m' >&2
-    printf " %q" "$@" >&2
+    for arg in "${@}" ; do
+      if [[ $arg =~ [[:space:]] ]] ; then
+        echo -n " '$arg'" >&2
+      else
+        echo -n " $arg" >&2
+      fi
+    done
     echo >&2
   fi
 }
@@ -29,7 +35,12 @@ function plugin_read_config() {
 
 # Reads either a value or a list from plugin config
 function plugin_read_list() {
-  local prefix="BUILDKITE_PLUGIN_DOCKER_COMPOSE_$1"
+  prefix_read_list "BUILDKITE_PLUGIN_DOCKER_COMPOSE_$1"
+}
+
+# Reads either a value or a list from the given env prefix
+function prefix_read_list() {
+  local prefix="$1"
   local parameter="${prefix}_0"
 
   if [[ -n "${!parameter:-}" ]]; then
@@ -43,6 +54,28 @@ function plugin_read_list() {
   elif [[ -n "${!prefix:-}" ]]; then
     echo "${!prefix}"
   fi
+}
+
+# Reads either a value or a list from plugin config into a global result array
+# Returns success if values were read
+function plugin_read_list_into_result() {
+  local prefix="$1"
+  local parameter="${prefix}_0"
+  result=()
+
+  if [[ -n "${!parameter:-}" ]]; then
+    local i=0
+    local parameter="${prefix}_${i}"
+    while [[ -n "${!parameter:-}" ]]; do
+      result+=("${!parameter}")
+      i=$((i+1))
+      parameter="${prefix}_${i}"
+    done
+  elif [[ -n "${!prefix:-}" ]]; then
+    result+=("${!prefix}")
+  fi
+
+  [[ ${#result[@]} -gt 0 ]] || return 1
 }
 
 # Returns the name of the docker compose project for this build
@@ -67,7 +100,8 @@ function docker_compose_config_files() {
     [[ -n "$line" ]] && config_files+=("$line")
   done <<< "$(plugin_read_list CONFIG)"
 
-  if [[ ${#config_files[@]:-} -eq 0 ]]  ; then
+  # Use a default if there are no config files specified
+  if [[ -z "${config_files[*]:-}" ]]  ; then
     echo "docker-compose.yml"
     return
   fi
@@ -91,8 +125,16 @@ function build_image_override_file() {
     "$(docker_compose_config_version)" "$@"
 }
 
+# Checks that a specific version of docker-compose supports cache_from
+function docker_compose_supports_cache_from() {
+  local version="$1"
+  if [[ -z "$version" || "$version" == 1* || "$version" =~ ^(2|3)(\.[01])?$ ]] ; then
+    return 1
+  fi
+}
+
 # Build an docker-compose file that overrides the image for a specific
-# docker-compose version and set of service and image pairs
+# docker-compose version and set of [ service, image, cache_from ] tuples
 function build_image_override_file_with_version() {
   local version="$1"
 
@@ -112,9 +154,9 @@ function build_image_override_file_with_version() {
     printf "    image: %s\\n" "$2"
 
     if [[ -n "$3" ]] ; then
-      if [[ -z "$version" || "$version" == 2* || "$version" == 3 || "$version" == 3.0* || "$version" == 3.1* ]]; then
+      if ! docker_compose_supports_cache_from "$version" ; then
         echo "Unsupported Docker Compose config file version: $version"
-        echo "The 'cache_from' option can only be used with Compose file versions 3.2 and above."
+        echo "The 'cache_from' option can only be used with Compose file versions 2.2 or 3.2 and above."
         echo "For more information on Docker Compose configuration file versions, see:"
         echo "https://docs.docker.com/compose/compose-file/compose-versioning/#versioning"
         exit 1
@@ -146,10 +188,18 @@ function run_docker_compose() {
   plugin_prompt_and_run "${command[@]}" "$@"
 }
 
+# Create an image name that is used to tag custom images
 function build_image_name() {
   local service_name="$1"
-  local default="${BUILDKITE_PIPELINE_SLUG}-${service_name}-build-${BUILDKITE_BUILD_NUMBER}"
-  plugin_read_config IMAGE_NAME "$default"
+  local service_idx="$2"
+  local image_names=()
+
+  while read -r name ; do
+    image_names+=("$name")
+  done <<< "$(plugin_read_list IMAGE_NAME)"
+
+  # Either look in custom image_name values, or use our default
+  echo "${image_names[$service_idx]:-${BUILDKITE_PIPELINE_SLUG}-${service_name}-build-${BUILDKITE_BUILD_NUMBER}}"
 }
 
 function in_array() {
@@ -178,6 +228,12 @@ function retry {
       sleep $(((attempts - 2) * 2))
     fi
   done
+}
 
-  echo "$status"
+function is_windows() {
+  [[ "$OSTYPE" =~ ^(win|msys|cygwin) ]]
+}
+
+function is_macos() {
+  [[ "$OSTYPE" =~ ^(darwin) ]]
 }
